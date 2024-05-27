@@ -1,0 +1,95 @@
+#!/bin/bash
+# Paths and variables
+TIMER_FILE="/tmp/mpc_timer.txt" # Timer file
+MPD_LOG="/var/log/mpd/log" # MPD log
+SEARCH_STRING="Error opening ALSA device" # Playback failed when USB is disabled
+# USB hub and port
+HUB="1-1"
+PORT="4"
+
+### FUNCTIONS ###
+
+# Check if USB enabled, return 1 if enabled
+check_usb() {
+    if sudo uhubctl -l "$HUB" -p "$PORT" | grep -q "off"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check mpc status, return 1 if playing
+check_mpc() {
+    if mpc status | grep -q '\playing'; then
+    return 1
+    else
+    return 0
+    fi
+}
+
+enable_usb() {
+    sudo uhubctl -l $HUB -p $PORT -a 1
+    sleep 1
+    mpc play
+}
+
+disable_usb() {
+    sudo uhubctl -l $HUB -p $PORT -a 0
+}
+
+reset_timer() {
+    echo "0" > "$TIMER_FILE"
+}
+
+# Initialize or read the timer value
+if [ ! -f "$TIMER_FILE" ]; then
+    echo "0" > "$TIMER_FILE"
+fi
+
+# Monitor the log file in the background
+tail -F "$MPD_LOG" | while read -r line; do
+    echo "$line" | grep -q "$SEARCH_STRING"
+    if [ $? -eq 0 ]; then
+        echo "ALSA ERROR DETECTED"
+        check_usb
+        if [ $? -eq 0 ]; then
+            enable_usb
+        fi
+    fi
+done &
+
+# Capture the PID of the background 'tail' process
+TAIL_PID=$!
+
+# Ensure the tail process is terminated when the script exits
+trap 'kill $TAIL_PID' EXIT
+
+
+### MAIN LOOP
+
+while true; do
+    echo "start"
+    # Read timer value
+    timer=$(<"$TIMER_FILE")
+    check_mpc
+    if [ $? -eq 1 ]; then
+        echo "resetting timer"
+        reset_timer
+    else
+        echo "incrementing timer"
+        timer=$((timer + 1))
+        echo "$timer" > "$TIMER_FILE"
+        echo "$timer"
+    fi
+    if [ "$timer" -ge 10 ]; then
+        check_usb
+        if [ $? -eq 1 ]; then
+            disable_usb
+            reset_timer
+        else
+            echo "USB already disabled"
+            reset_timer
+        fi
+    fi
+    sleep 1
+done
