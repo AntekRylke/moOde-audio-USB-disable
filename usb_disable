@@ -68,18 +68,15 @@ trap 'kill $TAIL_PID' EXIT
 ### MAIN LOOP
 
 while true; do
-    echo "start"
     # Read timer value
     timer=$(<"$TIMER_FILE")
     check_mpc
     if [ $? -eq 1 ]; then
-        echo "resetting timer"
         reset_timer
     else
         echo "incrementing timer"
         timer=$((timer + 1))
         echo "$timer" > "$TIMER_FILE"
-        echo "$timer"
     fi
     if [ "$timer" -ge 10 ]; then
         check_usb
@@ -87,7 +84,6 @@ while true; do
             disable_usb
             reset_timer
         else
-            echo "USB already disabled"
             reset_timer
         fi
     fi
