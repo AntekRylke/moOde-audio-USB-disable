@@ -78,7 +78,7 @@ while true; do
         timer=$((timer + 1))
         echo "$timer" > "$TIMER_FILE"
     fi
-    if [ "$timer" -ge 10 ]; then
+    if [ "$timer" -ge 120 ]; then
         check_usb
         if [ $? -eq 1 ]; then
             disable_usb
