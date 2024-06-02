@@ -1,11 +1,12 @@
 #!/bin/bash
 # Paths and variables
-TIMER_FILE="/tmp/mpc_timer.txt" # Timer file
 MPD_LOG="/var/log/mpd/log" # MPD log
+LOG_FILE="/home/pi/usb_disable.log"
 SEARCH_STRING="Error opening ALSA device" # Playback failed when USB is disabled
 # USB hub and port
 HUB="1-1"
 PORT="4"
+echo "Script started at $(date)" >> "$LOG_FILE"
 
 ### FUNCTIONS ###
 
@@ -21,9 +22,9 @@ check_usb() {
 # Check mpc status, return 1 if playing
 check_mpc() {
     if mpc status | grep -q '\playing'; then
-    return 1
+        return 1
     else
-    return 0
+        return 0
     fi
 }
 
@@ -38,13 +39,11 @@ disable_usb() {
 }
 
 reset_timer() {
-    echo "0" > "$TIMER_FILE"
+    timer=0
 }
 
-# Initialize or read the timer value
-if [ ! -f "$TIMER_FILE" ]; then
-    echo "0" > "$TIMER_FILE"
-fi
+# Initialize timer variable
+timer=0
 
 # Monitor the log file in the background
 tail -F "$MPD_LOG" | while read -r line; do
@@ -68,15 +67,11 @@ trap 'kill $TAIL_PID' EXIT
 ### MAIN LOOP
 
 while true; do
-    # Read timer value
-    timer=$(<"$TIMER_FILE")
     check_mpc
     if [ $? -eq 1 ]; then
         reset_timer
     else
-        echo "incrementing timer"
         timer=$((timer + 1))
-        echo "$timer" > "$TIMER_FILE"
     fi
     if [ "$timer" -ge 120 ]; then
         check_usb
