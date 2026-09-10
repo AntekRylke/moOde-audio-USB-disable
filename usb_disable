@@ -2,7 +2,7 @@
 # Paths and variables
 MPD_LOG="/var/log/mpd/log" # MPD log
 LOG_FILE="/home/pi/usb_disable.log"
-SEARCH_STRING="Error opening ALSA device" # Playback failed when USB is disabled
+SEARCH_STRING="Failed to open ALSA device" # Playback failed when USB is disabled
 # USB hub and port
 HUB="1-1"
 PORT="4"
