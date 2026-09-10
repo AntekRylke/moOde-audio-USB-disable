@@ -3,9 +3,9 @@ Description=USB Disable Script
 After=network.target
 
 [Service]
-ExecStart=/bin/bash /home/pi/usb_disable.sh
-StandardOutput=append:/home/pi/usb_disable.log
-StandardError=append:/home/pi/usb_disable.log
+ExecStart=/bin/bash /home/antek/usb_disable.sh
+StandardOutput=append:/home/antek/usb_disable.log
+StandardError=append:/home/antek/usb_disable.log
 
 [Install]
 WantedBy=multi-user.target
