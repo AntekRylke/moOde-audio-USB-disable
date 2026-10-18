@@ -16,8 +16,6 @@ API_KEY=""   # Leave empty if no API key is configured
 # How often to refresh the screen-on command while playing
 SCREEN_REFRESH_SECONDS=10
 
-echo "Script started at $(date)" >> "$LOG_FILE"
-
 ### FUNCTIONS ###
 
 check_usb() {
@@ -39,12 +37,18 @@ check_mpc() {
 
 fk_screen_on() {
     if [ -n "$API_KEY" ]; then
-        curl -s -X POST \
+        curl -s \
+            --connect-timeout 2 \
+            --max-time 3 \
+            -X POST \
             -H "X-Api-Key: $API_KEY" \
-            "http://$TABLET_IP:$TABLET_PORT/api/screen/on" >/dev/null
+            "http://$TABLET_IP:$TABLET_PORT/api/screen/on" >/dev/null 2>&1
     else
-        curl -s -X POST \
-            "http://$TABLET_IP:$TABLET_PORT/api/screen/on" >/dev/null
+        curl -s \
+            --connect-timeout 2 \
+            --max-time 3 \
+            -X POST \
+            "http://$TABLET_IP:$TABLET_PORT/api/screen/on" >/dev/null 2>&1
     fi
 }
 
@@ -65,7 +69,6 @@ reset_timer() {
 # Monitor MPD log for ALSA failures
 tail -F "$MPD_LOG" | while read -r line; do
     if echo "$line" | grep -q "$SEARCH_STRING"; then
-        echo "$(date) ALSA ERROR DETECTED" >> "$LOG_FILE"
         if check_usb; then
             enable_usb
         fi
