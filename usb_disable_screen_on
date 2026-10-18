@@ -1,0 +1,116 @@
+#!/bin/bash
+# Paths and variables
+MPD_LOG="/var/log/mpd/log"
+LOG_FILE="/home/pi/usb_disable.log"
+SEARCH_STRING="Failed to open ALSA device"
+
+# USB hub and port
+HUB="1-1"
+PORT="4"
+
+# FreeKiosk tablet
+TABLET_IP="192.168.1.50"
+TABLET_PORT="8080"
+API_KEY=""   # Leave empty if no API key is configured
+
+# How often to refresh the screen-on command while playing
+SCREEN_REFRESH_SECONDS=10
+
+echo "Script started at $(date)" >> "$LOG_FILE"
+
+### FUNCTIONS ###
+
+check_usb() {
+    if sudo uhubctl -l "$HUB" -p "$PORT" | grep -q "off"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Return 0 if playing, 1 if not
+check_mpc() {
+    if mpc status | grep -q '\[playing\]'; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+fk_screen_on() {
+    if [ -n "$API_KEY" ]; then
+        curl -s -X POST \
+            -H "X-Api-Key: $API_KEY" \
+            "http://$TABLET_IP:$TABLET_PORT/api/screen/on" >/dev/null
+    else
+        curl -s -X POST \
+            "http://$TABLET_IP:$TABLET_PORT/api/screen/on" >/dev/null
+    fi
+}
+
+enable_usb() {
+    sudo uhubctl -l "$HUB" -p "$PORT" -a 1
+    sleep 1
+    mpc play
+}
+
+disable_usb() {
+    sudo uhubctl -l "$HUB" -p "$PORT" -a 0
+}
+
+reset_timer() {
+    timer=0
+}
+
+# Monitor MPD log for ALSA failures
+tail -F "$MPD_LOG" | while read -r line; do
+    if echo "$line" | grep -q "$SEARCH_STRING"; then
+        echo "$(date) ALSA ERROR DETECTED" >> "$LOG_FILE"
+        if check_usb; then
+            enable_usb
+        fi
+    fi
+done &
+
+TAIL_PID=$!
+trap 'kill "$TAIL_PID"' EXIT
+
+### MAIN LOOP ###
+
+timer=0
+screen_timer=0
+
+last_playing="no"
+
+while true; do
+    if check_mpc; then
+        current_playing="yes"
+        reset_timer
+
+        if [ "$last_playing" != "yes" ]; then
+            fk_screen_on
+            screen_timer=0
+        elif [ "$screen_timer" -ge "$SCREEN_REFRESH_SECONDS" ]; then
+            fk_screen_on
+            screen_timer=0
+        else
+            screen_timer=$((screen_timer + 1))
+        fi
+
+        last_playing="yes"
+    else
+        current_playing="no"
+        screen_timer=0
+        timer=$((timer + 1))
+        last_playing="no"
+    fi
+
+    if [ "$timer" -ge 120 ]; then
+        if ! check_usb; then
+            disable_usb
+        fi
+        reset_timer
+    fi
+
+    sleep 1
+done
