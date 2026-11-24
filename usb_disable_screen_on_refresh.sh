@@ -59,13 +59,13 @@ fk_reload() {
             --max-time 3 \
             -X POST \
             -H "X-Api-Key: $API_KEY" \
-            "http://$TABLET_IP:$TABLET_PORT/api/reload" >/dev/null 2>&1
+            "http://$TABLET_IP:$TABLET_PORT/api/clearCache" >/dev/null 2>&1
     else
         curl -s \
             --connect-timeout 2 \
             --max-time 3 \
             -X POST \
-            "http://$TABLET_IP:$TABLET_PORT/api/reload" >/dev/null 2>&1
+            "http://$TABLET_IP:$TABLET_PORT/api/clearCache" >/dev/null 2>&1
     fi
 }
 
@@ -101,16 +101,20 @@ timer=0
 screen_timer=0
 
 last_playing="no"
+last_song=""
 
 while true; do
     if check_mpc; then
         current_playing="yes"
+        current_song=$(mpc -f '%file%' current)
         reset_timer
 
         if [ "$last_playing" != "yes" ]; then
             fk_reload
             fk_screen_on
             screen_timer=0
+        elif [ -n "$current_song" ] && [ "$current_song" != "$last_song" ]; then
+            fk_reload
         elif [ "$screen_timer" -ge "$SCREEN_REFRESH_SECONDS" ]; then
             fk_screen_on
             screen_timer=0
@@ -118,6 +122,9 @@ while true; do
             screen_timer=$((screen_timer + 1))
         fi
 
+        if [ -n "$current_song" ]; then
+            last_song="$current_song"
+        fi
         last_playing="yes"
     else
         current_playing="no"
